@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Soundrop Rebirth</title>
+<meta name="description" content="Un gioco musicale di geometria: disegna strumenti a linea, fai rimbalzare le palline, crea musica." />
+
+<!-- PWA / iOS home screen -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0b0d17" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Soundrop" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-192.png" />
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="field"></canvas>
+
+  <div class="top-bar">
+    <div class="logo"><b>Soundrop</b> Rebirth</div>
+    <button class="icon-btn" id="menuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>
+    </button>
+  </div>
+
+  <div class="hint" id="hint">Tocca e trascina per disegnare uno strumento. Tieni premuto sul campo per creare un dropper.</div>
+
+  <div class="color-selector" id="colorSelector"></div>
+
+  <!-- Scrim shared by all sheets -->
+  <div class="sheet-scrim" id="scrim"></div>
+
+  <!-- Main menu sheet -->
+  <div class="sheet" id="menuSheet">
+    <div class="sheet-handle"></div>
+    <div class="close-row"><button class="ghost" id="closeMenu">Chiudi</button></div>
+    <h2>Menu</h2>
+
+    <h3>Strumenti per colore</h3>
+    <div id="instrumentList"></div>
+
+    <h3>Fisica</h3>
+    <div class="segmented" id="gravityModeToggle">
+      <button data-mode="fixed" class="active">Gravità fissa</button>
+      <button data-mode="real">Gravità reale</button>
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Gravità</span><span id="gravityVal">1.00</span></div>
+      <input type="range" id="gravitySlider" min="0" max="3" step="0.01" value="1" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Attrito dell'aria</span><span id="frictionVal">0.05</span></div>
+      <input type="range" id="frictionSlider" min="0" max="1" step="0.01" value="0.05" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Rimbalzo</span><span id="bounceVal">0.85</span></div>
+      <input type="range" id="bounceSlider" min="0" max="1.1" step="0.01" value="0.85" />
+    </div>
+
+    <h3>Partita</h3>
+    <button class="primary" id="saveGameBtn">Salva partita</button>
+    <div id="saveList" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- Dropper tempo sheet -->
+  <div class="sheet" id="tempoSheet">
+    <div class="sheet-handle"></div>
+    <div class="close-row"><button class="ghost" id="closeTempo">Chiudi</button></div>
+    <h2>Dropper</h2>
+    <div class="slider-block">
+      <div class="slider-label"><span>Tempo di rilascio</span><span id="tempoVal">1 al secondo</span></div>
+      <input type="range" id="tempoSlider" min="0" max="1" step="0.001" value="0.5" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Variabilità</span><span id="variabilityVal">+/- x0.00</span></div>
+      <input type="range" id="variabilitySlider" min="0" max="0.95" step="0.01" value="0" />
+    </div>
+    <button class="danger-ghost" id="removeDropperBtn" style="width:100%; margin-top:10px; padding:12px; text-align:center;">Rimuovi questo dropper</button>
+  </div>
+</div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>
