@@ -1,5 +1,5 @@
 import { Ball, LineInstrument, stepWorld } from "./physics.js";
-import { AudioEngine, INSTRUMENT_IDS } from "./audio.js";
+import { AudioEngine } from "./audio.js";
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -8,6 +8,7 @@ import { AudioEngine, INSTRUMENT_IDS } from "./audio.js";
 const canvas = document.getElementById("field");
 const ctx = canvas.getContext("2d");
 const audio = new AudioEngine();
+audio.loadSamples(); // fire-and-forget: fills the instrument dropdown once ready
 
 const COLOR_SLOTS = [
   { id: "white", hex: "#f5f5f0", instrument: "marimba" },
@@ -342,11 +343,11 @@ function renderInstrumentList() {
     label.appendChild(document.createTextNode(capitalize(slot.id)));
 
     const select = document.createElement("select");
-    for (const instId of INSTRUMENT_IDS) {
+    for (const inst of audio.getAvailableInstruments()) {
       const opt = document.createElement("option");
-      opt.value = instId;
-      opt.textContent = capitalize(instId);
-      if (instId === slot.instrument) opt.selected = true;
+      opt.value = inst.id;
+      opt.textContent = inst.label;
+      if (inst.id === slot.instrument) opt.selected = true;
       select.appendChild(opt);
     }
     select.addEventListener("change", () => {

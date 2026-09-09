@@ -132,10 +132,17 @@ const INSTRUMENTS = {
 
 export const INSTRUMENT_IDS = Object.keys(INSTRUMENTS);
 
+// Sample-backed instrument ids are prefixed so they never collide with the
+// procedural ones above (e.g. a sample named "marimba" won't clash with
+// INSTRUMENTS.marimba).
+const SAMPLE_PREFIX = "sample:";
+
 export class AudioEngine {
   constructor() {
     this.ctx = null;
     this.master = null;
+    this.samples = new Map(); // id (without prefix) -> { buffer, baseFrequency, gain, label }
+    this.samplesReady = null;
   }
 
   ensureContext() {
@@ -148,16 +155,93 @@ export class AudioEngine {
     if (this.ctx.state === "suspended") this.ctx.resume();
   }
 
+  // Loads samples/samples.json (an array of {id, label, file, baseFrequency, gain})
+  // and decodes each referenced audio file. Safe to call once at startup —
+  // any entry that fails to load (missing file, bad path) is skipped silently
+  // so a broken manifest never blocks the app from starting.
+  async loadSamples() {
+    this.ensureContext();
+    if (this.samplesReady) return this.samplesReady;
+    this.samplesReady = (async () => {
+      let manifest = [];
+      try {
+        const res = await fetch("samples/samples.json");
+        if (res.ok) manifest = await res.json();
+      } catch {
+        manifest = [];
+      }
+      await Promise.all(
+        manifest.map(async (entry) => {
+          try {
+            const res = await fetch(`samples/${entry.file}`);
+            const arrayBuffer = await res.arrayBuffer();
+            const buffer = await this.ctx.decodeAudioData(arrayBuffer);
+            this.samples.set(entry.id, {
+              buffer,
+              baseFrequency: entry.baseFrequency || 261.63,
+              gain: entry.gain ?? 1,
+              label: entry.label || entry.id,
+            });
+          } catch (err) {
+            console.warn(`Soundrop: campione "${entry.id}" non caricato.`, err);
+          }
+        })
+      );
+    })();
+    return this.samplesReady;
+  }
+
+  // Combined list for UI dropdowns: procedural instruments + loaded samples.
+  getAvailableInstruments() {
+    const procedural = INSTRUMENT_IDS.map((id) => ({ id, label: INSTRUMENTS[id].label }));
+    const sampled = [...this.samples.entries()].map(([id, s]) => ({
+      id: SAMPLE_PREFIX + id,
+      label: `🎵 ${s.label}`,
+    }));
+    return [...procedural, ...sampled];
+  }
+
   // speed: collision speed in px/s (already accounts for physics scale)
-  // instrumentId: which timbre to use
+  // instrumentId: which timbre to use — either a procedural id, or a
+  // "sample:<id>" id referring to an entry loaded via loadSamples().
   play(instrumentId, speed) {
     this.ensureContext();
-    const instrument = INSTRUMENTS[instrumentId] || INSTRUMENTS.marimba;
-    // Map speed -> frequency (musical, pentatonic-ish spread) and -> velocity (loudness/brightness)
     const clamped = Math.max(20, Math.min(speed, 1600));
     const t = (clamped - 20) / (1600 - 20); // 0..1
     const freq = 130 * Math.pow(2, t * 3.2); // ~130Hz .. ~1250Hz
     const vel = 0.25 + t * 0.75; // 0.25..1.0
+
+    if (typeof instrumentId === "string" && instrumentId.startsWith(SAMPLE_PREFIX)) {
+      const sample = this.samples.get(instrumentId.slice(SAMPLE_PREFIX.length));
+      if (sample) {
+        this.playSample(sample, freq, vel);
+        return;
+      }
+      // Sample missing/not loaded yet — fall through to procedural default.
+    }
+    const instrument = INSTRUMENTS[instrumentId] || INSTRUMENTS.marimba;
     instrument.make(this.ctx, this.master, freq, vel);
+  }
+
+  playSample(sample, freq, vel) {
+    const now = this.ctx.currentTime;
+    const source = this.ctx.createBufferSource();
+    source.buffer = sample.buffer;
+    // Pitch-shift the sample by playback rate, clamped so extreme collision
+    // speeds don't turn it into an unrecognizable chipmunk/demon voice.
+    const rate = Math.max(0.5, Math.min(2.2, freq / sample.baseFrequency));
+    source.playbackRate.value = rate;
+
+    const gainNode = this.ctx.createGain();
+    const peak = 0.8 * vel * sample.gain;
+    const durationAtRate = sample.buffer.duration / rate;
+    gainNode.gain.setValueAtTime(peak, now);
+    // Fade out just before the sample's natural end to avoid a click if the
+    // source file doesn't already fade to silence.
+    gainNode.gain.linearRampToValueAtTime(0.0001, now + Math.max(0.05, durationAtRate - 0.03));
+
+    source.connect(gainNode).connect(this.master);
+    source.start(now);
+    source.stop(now + durationAtRate);
   }
 }
