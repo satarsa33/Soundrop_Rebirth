@@ -173,7 +173,7 @@ export class AudioEngine {
       await Promise.all(
         manifest.map(async (entry) => {
           try {
-            const res = await fetch(`samples/${entry.file}`);
+            const res = await fetch(`samples/${encodeURIComponent(entry.file)}`);
             const arrayBuffer = await res.arrayBuffer();
             const buffer = await this.ctx.decodeAudioData(arrayBuffer);
             this.samples.set(entry.id, {
