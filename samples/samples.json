@@ -4,4 +4,5 @@
   { "id": "evil9bass", "label": "Evil 9 Bass", "file": "Evil 9 Bass.wav", "baseFrequency": 261.63, "gain": 1 },
   { "id": "popcorn", "label": "Popcorn", "file": "Popcorn.wav", "baseFrequency": 261.63, "gain": 1 },
   { "id": "tarkus", "label": "Tarkus", "file": "Tarkus.wav", "baseFrequency": 261.63, "gain": 1 }
+  { "id": "ArpCm", "label": "ArpCm", "file": "ArpCmMiniMoog.wav", "baseFrequency": 261.63, "gain": 1 }
 ]
