@@ -44,6 +44,42 @@
     <h3>Strumenti per colore</h3>
     <div id="instrumentList"></div>
 
+    <h3>Effetti audio</h3>
+
+    <div class="row">
+      <div class="row-label">Delay</div>
+      <button class="ghost effect-toggle" id="delayToggleBtn">Off</button>
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Tempo</span><span id="delayTimeVal">300 ms</span></div>
+      <input type="range" id="delayTimeSlider" min="20" max="800" step="5" value="300" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Feedback</span><span id="delayFeedbackVal">35%</span></div>
+      <input type="range" id="delayFeedbackSlider" min="0" max="90" step="1" value="35" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Mix</span><span id="delayMixVal">30%</span></div>
+      <input type="range" id="delayMixSlider" min="0" max="100" step="1" value="30" />
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div class="row-label">Riverbero</div>
+      <button class="ghost effect-toggle" id="reverbToggleBtn">Off</button>
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Decadimento</span><span id="reverbDecayVal">2.0 s</span></div>
+      <input type="range" id="reverbDecaySlider" min="0.2" max="6" step="0.1" value="2" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Tono</span><span id="reverbDampingVal">40%</span></div>
+      <input type="range" id="reverbDampingSlider" min="0" max="100" step="1" value="40" />
+    </div>
+    <div class="slider-block">
+      <div class="slider-label"><span>Mix</span><span id="reverbMixVal">25%</span></div>
+      <input type="range" id="reverbMixSlider" min="0" max="100" step="1" value="25" />
+    </div>
+
     <h3>Fisica</h3>
     <div class="segmented" id="gravityModeToggle">
       <button data-mode="fixed" class="active">Gravità fissa</button>

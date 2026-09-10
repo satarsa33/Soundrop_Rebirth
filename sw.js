@@ -3,7 +3,7 @@
 // once it has been visited at least once (important for the "Add to Home
 // Screen" native-like experience on iOS).
 
-const CACHE_NAME = "soundrop-rebirth-v4";
+const CACHE_NAME = "soundrop-rebirth-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const ASSETS = [
   "./physics.js",
   "./audio.js",
   "./manifest.json",
+  "./samples/samples.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-180.png",

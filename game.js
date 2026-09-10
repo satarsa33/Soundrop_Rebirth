@@ -320,8 +320,10 @@ document.getElementById("closeMenu").addEventListener("click", closeSheets);
 document.getElementById("closeTempo").addEventListener("click", closeSheets);
 
 document.getElementById("menuBtn").addEventListener("click", () => {
+  audio.ensureContext();
   renderInstrumentList();
   renderSaveList();
+  syncFxUIFromEngine();
   openSheet(menuSheet);
 });
 
@@ -404,6 +406,96 @@ gravityModeToggle.addEventListener("click", (e) => {
   setGravityMode(btn.dataset.mode);
 });
 
+// ---- Effetti audio: delay ----
+
+const delayToggleBtn = document.getElementById("delayToggleBtn");
+const delayTimeSlider = document.getElementById("delayTimeSlider");
+const delayFeedbackSlider = document.getElementById("delayFeedbackSlider");
+const delayMixSlider = document.getElementById("delayMixSlider");
+const delayTimeVal = document.getElementById("delayTimeVal");
+const delayFeedbackVal = document.getElementById("delayFeedbackVal");
+const delayMixVal = document.getElementById("delayMixVal");
+
+function setDelayToggleUI(enabled) {
+  delayToggleBtn.textContent = enabled ? "On" : "Off";
+  delayToggleBtn.classList.toggle("active", enabled);
+}
+delayToggleBtn.addEventListener("click", () => {
+  const enabled = delayToggleBtn.textContent !== "On";
+  audio.setDelayEnabled(enabled);
+  setDelayToggleUI(enabled);
+});
+delayTimeSlider.addEventListener("input", () => {
+  const ms = parseFloat(delayTimeSlider.value);
+  audio.setDelayTime(ms / 1000);
+  delayTimeVal.textContent = `${ms} ms`;
+});
+delayFeedbackSlider.addEventListener("input", () => {
+  const pct = parseFloat(delayFeedbackSlider.value);
+  audio.setDelayFeedback(pct / 100);
+  delayFeedbackVal.textContent = `${pct}%`;
+});
+delayMixSlider.addEventListener("input", () => {
+  const pct = parseFloat(delayMixSlider.value);
+  audio.setDelayMix(pct / 100);
+  delayMixVal.textContent = `${pct}%`;
+});
+
+// ---- Effetti audio: riverbero ----
+
+const reverbToggleBtn = document.getElementById("reverbToggleBtn");
+const reverbDecaySlider = document.getElementById("reverbDecaySlider");
+const reverbDampingSlider = document.getElementById("reverbDampingSlider");
+const reverbMixSlider = document.getElementById("reverbMixSlider");
+const reverbDecayVal = document.getElementById("reverbDecayVal");
+const reverbDampingVal = document.getElementById("reverbDampingVal");
+const reverbMixVal = document.getElementById("reverbMixVal");
+
+function setReverbToggleUI(enabled) {
+  reverbToggleBtn.textContent = enabled ? "On" : "Off";
+  reverbToggleBtn.classList.toggle("active", enabled);
+}
+reverbToggleBtn.addEventListener("click", () => {
+  const enabled = reverbToggleBtn.textContent !== "On";
+  audio.setReverbEnabled(enabled);
+  setReverbToggleUI(enabled);
+});
+reverbDecaySlider.addEventListener("input", () => {
+  const s = parseFloat(reverbDecaySlider.value);
+  audio.setReverbDecay(s);
+  reverbDecayVal.textContent = `${s.toFixed(1)} s`;
+});
+reverbDampingSlider.addEventListener("input", () => {
+  const pct = parseFloat(reverbDampingSlider.value);
+  audio.setReverbDamping(pct / 100);
+  reverbDampingVal.textContent = `${pct}%`;
+});
+reverbMixSlider.addEventListener("input", () => {
+  const pct = parseFloat(reverbMixSlider.value);
+  audio.setReverbMix(pct / 100);
+  reverbMixVal.textContent = `${pct}%`;
+});
+
+function syncFxUIFromEngine() {
+  const d = audio.fx.delay;
+  const r = audio.fx.reverb;
+  delayTimeSlider.value = Math.round(d.time * 1000);
+  delayFeedbackSlider.value = Math.round(d.feedback * 100);
+  delayMixSlider.value = Math.round(d.mix * 100);
+  delayTimeVal.textContent = `${Math.round(d.time * 1000)} ms`;
+  delayFeedbackVal.textContent = `${Math.round(d.feedback * 100)}%`;
+  delayMixVal.textContent = `${Math.round(d.mix * 100)}%`;
+  setDelayToggleUI(d.enabled);
+
+  reverbDecaySlider.value = r.decay;
+  reverbDampingSlider.value = Math.round(r.damping * 100);
+  reverbMixSlider.value = Math.round(r.mix * 100);
+  reverbDecayVal.textContent = `${r.decay.toFixed(1)} s`;
+  reverbDampingVal.textContent = `${Math.round(r.damping * 100)}%`;
+  reverbMixVal.textContent = `${Math.round(r.mix * 100)}%`;
+  setReverbToggleUI(r.enabled);
+}
+
 // ---- Save / load ----
 
 const SAVE_KEY = "soundrop_rebirth_saves_v1";
@@ -439,6 +531,10 @@ function serializeGame() {
       restitution: world.restitution,
       gravityMode: world.gravityMode,
     },
+    fx: {
+      delay: { ...audio.fx.delay },
+      reverb: { ...audio.fx.reverb },
+    },
   };
 }
 
@@ -470,6 +566,10 @@ function applyGame(data) {
     frictionVal.textContent = world.airFriction.toFixed(2);
     bounceVal.textContent = world.restitution.toFixed(2);
     setGravityMode(data.world.gravityMode || "fixed", true);
+  }
+  if (data.fx) {
+    audio.applyFxState(data.fx);
+    syncFxUIFromEngine();
   }
 }
 

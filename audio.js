@@ -141,8 +141,14 @@ export class AudioEngine {
   constructor() {
     this.ctx = null;
     this.master = null;
+    this.voiceBus = null; // every instrument voice connects here instead of master directly
     this.samples = new Map(); // id (without prefix) -> { buffer, baseFrequency, gain, label }
     this.samplesReady = null;
+
+    this.fx = {
+      delay: { enabled: false, time: 0.3, feedback: 0.35, mix: 0.3 },
+      reverb: { enabled: false, decay: 2.0, damping: 0.4, mix: 0.25 },
+    };
   }
 
   ensureContext() {
@@ -151,8 +157,144 @@ export class AudioEngine {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.9;
       this.master.connect(this.ctx.destination);
+
+      // Every instrument voice connects to voiceBus. From there the dry
+      // signal always reaches master, and a send amount is tapped off to
+      // each effect chain (delay / reverb), which mixes back into master.
+      this.voiceBus = this.ctx.createGain();
+      this.voiceBus.connect(this.master); // dry path, always on
+
+      this._buildDelayChain();
+      this._buildReverbChain();
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
+  }
+
+  // ---- Delay -------------------------------------------------------------
+
+  _buildDelayChain() {
+    const ctx = this.ctx;
+    this.delaySend = ctx.createGain();
+    this.delaySend.gain.value = 0; // starts disabled
+    this.delayNode = ctx.createDelay(2.0);
+    this.delayNode.delayTime.value = this.fx.delay.time;
+    this.delayFeedback = ctx.createGain();
+    this.delayFeedback.gain.value = this.fx.delay.feedback;
+    this.delayTone = ctx.createBiquadFilter();
+    this.delayTone.type = "lowpass";
+    this.delayTone.frequency.value = 4200; // gently tames repeats so they don't get harsh
+
+    this.voiceBus.connect(this.delaySend);
+    this.delaySend.connect(this.delayNode);
+    this.delayNode.connect(this.delayTone);
+    this.delayTone.connect(this.delayFeedback);
+    this.delayFeedback.connect(this.delayNode); // feedback loop
+    this.delayTone.connect(this.master); // wet output
+  }
+
+  setDelayEnabled(enabled) {
+    this.ensureContext();
+    this.fx.delay.enabled = enabled;
+    this.delaySend.gain.setTargetAtTime(enabled ? this.fx.delay.mix : 0, this.ctx.currentTime, 0.02);
+  }
+  setDelayTime(seconds) {
+    this.ensureContext();
+    this.fx.delay.time = seconds;
+    this.delayNode.delayTime.setTargetAtTime(seconds, this.ctx.currentTime, 0.02);
+  }
+  setDelayFeedback(amount) {
+    this.ensureContext();
+    this.fx.delay.feedback = amount;
+    this.delayFeedback.gain.setTargetAtTime(amount, this.ctx.currentTime, 0.02);
+  }
+  setDelayMix(amount) {
+    this.ensureContext();
+    this.fx.delay.mix = amount;
+    if (this.fx.delay.enabled) {
+      this.delaySend.gain.setTargetAtTime(amount, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  // ---- Reverb --------------------------------------------------------------
+  // Algorithmic reverb: a convolver fed with a synthetically generated
+  // impulse response (filtered noise with an exponential decay envelope),
+  // so no external audio file is needed.
+
+  _buildReverbChain() {
+    const ctx = this.ctx;
+    this.reverbSend = ctx.createGain();
+    this.reverbSend.gain.value = 0; // starts disabled
+    this.convolver = ctx.createConvolver();
+    this._regenerateImpulse();
+
+    this.voiceBus.connect(this.reverbSend);
+    this.reverbSend.connect(this.convolver);
+    this.convolver.connect(this.master);
+  }
+
+  _regenerateImpulse() {
+    const ctx = this.ctx;
+    const decay = this.fx.reverb.decay;
+    const damping = this.fx.reverb.damping; // 0..1, higher = darker tail
+    const sampleRate = ctx.sampleRate;
+    const length = Math.max(1, Math.floor(sampleRate * decay));
+    const impulse = ctx.createBuffer(2, length, sampleRate);
+
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      let lp = 0;
+      // One-pole lowpass smoothing on the noise itself: higher damping
+      // rolls off more high end as the tail decays, mimicking how real
+      // rooms absorb high frequencies faster than low ones.
+      const smoothing = 0.05 + damping * 0.9;
+      for (let i = 0; i < length; i++) {
+        const noise = Math.random() * 2 - 1;
+        lp = lp + (noise - lp) * (1 - smoothing);
+        const envelope = Math.pow(1 - i / length, 2 + damping * 3);
+        data[i] = lp * envelope;
+      }
+    }
+    this.convolver.buffer = impulse;
+  }
+
+  setReverbEnabled(enabled) {
+    this.ensureContext();
+    this.fx.reverb.enabled = enabled;
+    this.reverbSend.gain.setTargetAtTime(enabled ? this.fx.reverb.mix : 0, this.ctx.currentTime, 0.02);
+  }
+  setReverbDecay(seconds) {
+    this.ensureContext();
+    this.fx.reverb.decay = seconds;
+    this._regenerateImpulse();
+  }
+  setReverbDamping(amount) {
+    this.ensureContext();
+    this.fx.reverb.damping = amount;
+    this._regenerateImpulse();
+  }
+  setReverbMix(amount) {
+    this.ensureContext();
+    this.fx.reverb.mix = amount;
+    if (this.fx.reverb.enabled) {
+      this.reverbSend.gain.setTargetAtTime(amount, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  // Restores every FX parameter at once (used when loading a saved session).
+  applyFxState(fx) {
+    this.ensureContext();
+    if (!fx) return;
+    if (fx.delay) {
+      this.fx.delay = { ...this.fx.delay, ...fx.delay };
+      this.setDelayTime(this.fx.delay.time);
+      this.setDelayFeedback(this.fx.delay.feedback);
+      this.setDelayEnabled(this.fx.delay.enabled); // reads the mix value just merged above
+    }
+    if (fx.reverb) {
+      this.fx.reverb = { ...this.fx.reverb, ...fx.reverb };
+      this._regenerateImpulse();
+      this.setReverbEnabled(this.fx.reverb.enabled); // reads the mix value just merged above
+    }
   }
 
   // Loads samples/samples.json (an array of {id, label, file, baseFrequency, gain})
@@ -220,7 +362,7 @@ export class AudioEngine {
       // Sample missing/not loaded yet — fall through to procedural default.
     }
     const instrument = INSTRUMENTS[instrumentId] || INSTRUMENTS.marimba;
-    instrument.make(this.ctx, this.master, freq, vel);
+    instrument.make(this.ctx, this.voiceBus, freq, vel);
   }
 
   playSample(sample, freq, vel) {
@@ -240,7 +382,7 @@ export class AudioEngine {
     // source file doesn't already fade to silence.
     gainNode.gain.linearRampToValueAtTime(0.0001, now + Math.max(0.05, durationAtRate - 0.03));
 
-    source.connect(gainNode).connect(this.master);
+    source.connect(gainNode).connect(this.voiceBus);
     source.start(now);
     source.stop(now + durationAtRate);
   }

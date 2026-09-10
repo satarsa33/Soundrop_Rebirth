@@ -110,6 +110,16 @@ body {
   height: 20px;
 }
 
+.effect-toggle {
+  min-width: 64px;
+  text-align: center;
+}
+.effect-toggle.active {
+  background: var(--accent);
+  color: #04231f;
+  font-weight: 700;
+}
+
 /* ---------- Instrument color selector ---------- */
 
 .color-selector {
